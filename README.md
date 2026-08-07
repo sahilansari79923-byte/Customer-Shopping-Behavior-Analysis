@@ -2,6 +2,8 @@
 
 Analysis of 3,900 retail transactions to identify what drives customer spend and repeat purchases, with a Power BI dashboard and a set of business recommendations.
 
+![](https://github.com/sahilansari79923-byte/Customer-Shopping-Behavior-Analysis/blob/main/Snaps/Screenshot%202026-08-07%20145524.png)
+
 ## Overview
 
 A retail business had raw transaction data and no clear read on what was driving purchases or repeat business. This project cleans the dataset, models it in a relational database, and analyzes it to answer: what customer segments matter most, how shipping and subscription behavior relate to spend, and which products are performing best.
