@@ -29,7 +29,7 @@ n8n watches Gmail for the transaction report and pushes new attachments to S3 au
 
 The file lands in the bucket within seconds of the trigger firing.
 
-![S3 bucket](images/s3-bucket.png)
+![S3 bucket](https://github.com/sahilansari79923-byte/Customer-Shopping-Behavior-Analysis/blob/main/Snaps/Screenshot%202026-08-13%20160241.png)
 
 S3 sits between Gmail and Snowflake on purpose. It decouples ingestion from transformation and keeps a raw copy of every file that comes in, so a bad load into Snowflake never means re-pulling from Gmail.
 
