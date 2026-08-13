@@ -39,7 +39,7 @@ S3 sits between Gmail and Snowflake on purpose. It decouples ingestion from tran
 - 37 missing values in Review Rating, imputed using the median per product category
 - 
 ## Snowflake setup
-![snowflake workflow](https://github.com/sahilansari79923-byte/Customer-Shopping-Behavior-Analysis/blob/main/Snaps/trigger.png)
+![snowflake workflow](https://github.com/sahilansari79923-byte/Customer-Shopping-Behavior-Analysis/blob/main/Snaps/snowflake.png)
 Data is organized into three schemas:
 
 - `raw_data` — what lands from S3, untouched
