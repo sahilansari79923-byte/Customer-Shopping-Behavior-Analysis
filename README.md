@@ -37,6 +37,22 @@ S3 sits between Gmail and Snowflake on purpose. It decouples ingestion from tran
 
 - 3,900 transactions, 18 columns of transaction and customer data
 - 37 missing values in Review Rating, imputed using the median per product category
+- 
+## Snowflake setup
+![snowflake workflow](https://github.com/sahilansari79923-byte/Customer-Shopping-Behavior-Analysis/blob/main/Snaps/trigger.png)
+Data is organized into three schemas:
+
+- `raw_data` — what lands from S3, untouched
+- `staging` — cleaned data
+- `marts` — tables the analysis queries run against
+
+A dedicated warehouse runs the queries, with auto-suspend after 60 seconds idle to avoid burning credits.
+
+A file format handles the CSV coming in from S3, including header skipping and null handling, so a blank field doesn't get read as the literal string "null" instead of an actual null value.
+
+A stage points at the S3 bucket so Snowflake can load directly from it, no manual export or import step.
+
+Full setup script: `sql/setup.sql`
 
 ## Cleaning (pandas)
 
