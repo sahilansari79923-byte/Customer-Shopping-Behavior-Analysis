@@ -1,47 +1,116 @@
 # Customer Shopping Behavior Analysis
 
-Analysis of 3,900 retail transactions to identify what drives customer spend and repeat purchases, with a Power BI dashboard and a set of business recommendations.
+Automated pipeline that ingests retail transaction data from email, cleans it, runs analysis in Snowflake, and feeds a live Power BI dashboard.
 
 ![](https://github.com/sahilansari79923-byte/Customer-Shopping-Behavior-Analysis/blob/main/Snaps/Screenshot%202026-08-07%20145524.png)
 
-## Overview
+## The problem
 
-A retail business had raw transaction data and no clear read on what was driving purchases or repeat business. This project cleans the dataset, models it in a relational database, and analyzes it to answer: what customer segments matter most, how shipping and subscription behavior relate to spend, and which products are performing best.
+A retail business had 3,900 transactions worth of raw data and no clear read on what was driving purchases or repeat business. This started as a manual analysis to answer that. It's since grown into an automated pipeline that picks up new transaction reports on its own and keeps the dashboard current without anyone re-running a script.
+
+## Pipeline
+
+```
+Gmail → n8n → S3 → pandas (clean) → Snowflake (analyze) → Power BI
+```
+
+1. **Ingestion** - n8n watches Gmail for the transaction report and uploads the attachment to S3
+2. **Storage** - S3 holds the raw file
+3. **Cleaning** (pandas) - imputes missing Review Ratings using the category median, standardizes column names, builds `age_group` and `purchase_frequency_days`, drops the redundant `promo_code_used` column
+4. **Loading** - cleaned data goes into Snowflake
+5. **Analysis** (SQL) - revenue splits, customer segmentation, discount behavior, product performance
+6. **Dashboard** - Power BI connects to Snowflake and refreshes automatically
+
+## Automation
+
+n8n watches Gmail for the transaction report and pushes new attachments to S3 automatically. No manual upload step.
+
+![n8n workflow](images/n8n-workflow.png)
+
+The file lands in the bucket within seconds of the trigger firing.
+
+![S3 bucket](images/s3-bucket.png)
+
+S3 sits between Gmail and Snowflake on purpose. It decouples ingestion from transformation and keeps a raw copy of every file that comes in, so a bad load into Snowflake never means re-pulling from Gmail.
 
 ## Dataset
 
-- 3,900 total purchases
-- 18 columns covering transaction and customer demographic data
-- 37 missing values, all in the Review Rating column, imputed using the median
+- 3,900 transactions, 18 columns of transaction and customer data
+- 37 missing values in Review Rating, imputed using the median per product category
 
-## Tech stack
+## Cleaning (pandas)
 
-- **Python (pandas)** — data cleaning, feature engineering
-- **PostgreSQL** — structured storage and querying
-- **Power BI** — interactive dashboard
-- **SQL** — segment and revenue-driver queries
+Missing ratings filled per category instead of a flat median, so a low-rated category doesn't get pulled toward the dataset average:
 
-## Process
+```python
+df['Review Rating'] = df.groupby('Category')['Review Rating'].transform(
+    lambda x: x.fillna(x.median())
+)
+```
 
-1. **Data loading** — imported the raw dataset with pandas
-2. **Initial exploration** — structure check and summary statistics
-3. **Missing data handling** — imputed Review Rating with median values
-4. **Feature engineering** — created age groups and purchase frequency bands
-5. **Database integration** — loaded cleaned data into PostgreSQL for querying
+Age split into quartile-based groups rather than fixed bins, so each group holds roughly the same number of customers:
+
+```python
+labels = ['Young Adult', 'Adult', 'Middle-aged', 'Senior']
+df['age_group'] = pd.qcut(df['age'], q=4, labels=labels)
+```
+
+## Analysis (Snowflake SQL)
+
+Customer segments by purchase history:
+
+```sql
+WITH customer_type AS (
+    SELECT customer_id, previous_purchases,
+    CASE 
+        WHEN previous_purchases = 1 THEN 'New'
+        WHEN previous_purchases BETWEEN 2 AND 10 THEN 'Returning'
+        ELSE 'Loyal'
+    END AS customer_segment
+    FROM customer
+)
+SELECT customer_segment, COUNT(*) AS "Number of Customers"
+FROM customer_type
+GROUP BY customer_segment;
+```
+
+Customers who used a discount but still spent above the dataset average, the "smart shopper" group:
+
+```sql
+SELECT customer_id, purchase_amount
+FROM customer
+WHERE discount_applied = 'Yes'
+  AND purchase_amount >= (SELECT AVG(purchase_amount) FROM customer);
+```
+
+Top 3 products per category, ranked by order count:
+
+```sql
+WITH item_counts AS (
+    SELECT category, item_purchased,
+           COUNT(customer_id) AS total_orders,
+           ROW_NUMBER() OVER (PARTITION BY category ORDER BY COUNT(customer_id) DESC) AS item_rank
+    FROM customer
+    GROUP BY category, item_purchased
+)
+SELECT item_rank, category, item_purchased, total_orders
+FROM item_counts
+WHERE item_rank <= 3;
+```
 
 ## Key findings
 
-- **Revenue by gender**: Female customers generated slightly higher total revenue than male customers.
-- **Shipping and spend**: Express shipping customers spent 12% more per transaction ($65 vs. $58 average).
-- **Subscription impact**: Subscribers showed 68% higher spend, made up 45% of total revenue, and had a 78% loyalty rate vs. non-subscribers.
-- **Customer segmentation**: Loyal (15%), Returning (35%), New (50%) — with the biggest opportunity in converting New to Returning and Returning to Loyal.
-- **High-value discount users**: A "smart shopper" segment spends above average even while using discounts, a group worth targeting with premium offers.
-- **Top-rated products**: Blouses, dresses, and shirts had the strongest customer satisfaction scores.
+- Female customers generated slightly higher total revenue than male customers (revenue-by-gender query)
+- Express shipping customers spent 12% more per transaction, $65 vs. $58 average (shipping comparison query)
+- Subscribers spent 68% more, drove 45% of total revenue, and had a 78% loyalty rate (subscription query)
+- Customer base splits into Loyal (15%), Returning (35%), New (50%). Biggest opportunity is moving New into Returning and Returning into Loyal (segmentation query)
+- The smart-shopper segment above spends more than average even with a discount applied, worth targeting with premium offers instead of deeper discounts
+- Blouses, dresses, and shirts had the strongest customer satisfaction scores (top-rated products query)
 
 ## Recommendations
 
-- Grow the subscriber base through exclusive, subscriber-only benefits
-- Build loyalty rewards to increase retention among repeat buyers
+- Grow the subscriber base with subscriber-only perks
+- Build a loyalty program to retain repeat buyers
 - Target high-revenue and express-shipping segments directly
 - Feature top-rated products in marketing campaigns
 
@@ -49,9 +118,11 @@ A retail business had raw transaction data and no clear read on what was driving
 
 ```
 ├── data/                  # Raw and cleaned datasets
-├── notebooks/             # Python scripts / notebooks for cleaning & feature engineering
-├── sql/                   # SQL queries used for analysis
+├── notebooks/             # pandas cleaning and feature engineering
+├── sql/                   # Snowflake analysis queries
+├── automation/            # n8n workflow export
 ├── dashboard/             # Power BI dashboard file
+├── images/                # Screenshots referenced in this README
 ├── report/                # Project report and presentation
 └── README.md
 ```
