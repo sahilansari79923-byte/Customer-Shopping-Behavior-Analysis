@@ -25,7 +25,7 @@ Gmail → n8n → S3 → pandas (clean) → Snowflake (analyze) → Power BI
 
 n8n watches Gmail for the transaction report and pushes new attachments to S3 automatically. No manual upload step.
 
-![n8n workflow](images/n8n-workflow.png)
+![n8n workflow](https://github.com/sahilansari79923-byte/Customer-Shopping-Behavior-Analysis/blob/main/Snaps/trigger.png)
 
 The file lands in the bucket within seconds of the trigger firing.
 
